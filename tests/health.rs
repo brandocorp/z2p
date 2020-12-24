@@ -1,11 +1,34 @@
-use z2p::configuration::get_configuration;
+use z2p::configuration::{DatabaseSettings, get_configuration};
 use z2p::startup::run;
-use sqlx::PgPool;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
+use uuid::Uuid;
+
 use std::net::TcpListener;
 
 pub struct TestApp {
   pub address: String,
   pub db: PgPool,
+}
+
+pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
+  let mut connection = PgConnection::connect(&config.connection_string_without_db())
+    .await
+    .expect("Failed to connect to postgres.");
+  connection
+    .execute(&*format!(r#"CREATE DATABASE "{}";"#, config.database))
+    .await
+    .expect("Failed to create database.");
+  
+  let connection_pool = PgPool::connect(&config.connection_string())
+    .await
+    .expect("Failed to connect to postgres.");
+  
+  sqlx::migrate!("./migrations")
+    .run(&connection_pool)
+    .await
+    .expect("Failed to migrate the database.");
+  
+  connection_pool
 }
 
 async fn spawn_app() -> TestApp {
@@ -14,12 +37,11 @@ async fn spawn_app() -> TestApp {
   let port = listener.local_addr().unwrap().port();
   let address = format!("http://127.0.0.1:{}", port);
 
-  let config = get_configuration()
+  let mut config = get_configuration()
     .expect("Failed to read configuration.");
+  config.db.database = Uuid::new_v4().to_string();
 
-  let pool = PgPool::connect(&config.db.connection_string())
-    .await
-    .expect("Failed to connect to postgres database.");
+  let pool = configure_database(&config.db).await;
 
   let server = run(listener, pool.clone())
     .expect("Failed to bind address.");

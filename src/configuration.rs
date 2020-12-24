@@ -24,6 +24,16 @@ impl DatabaseSettings {
       self.database
     )
   }
+
+  pub fn connection_string_without_db(&self) -> String {
+    format!(
+      "postgres://{}:{}@{}:{}",
+      self.username,
+      self.password,
+      self.host,
+      self.port
+    )
+  }
 }
 
 #[derive(serde::Deserialize)]
