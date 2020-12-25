@@ -1,11 +1,16 @@
-use sqlx::PgPool;
+use sqlx::postgres::PgPool;
 use z2p::configuration::get_configuration;
 use z2p::startup::run;
+use z2p::telemetry::{get_subscriber, init_subscriber};
 
 use std::net::TcpListener;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
+
+    init_subscriber(get_subscriber("z2p".into(), "info".into()));
+    
+
     let config = get_configuration()
         .expect("Failed to read configuration.");
 

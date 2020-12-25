@@ -1,9 +1,17 @@
 use z2p::configuration::{DatabaseSettings, get_configuration};
 use z2p::startup::run;
+use z2p::telemetry::{get_subscriber, init_subscriber};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 
 use std::net::TcpListener;
+
+lazy_static::lazy_static! {
+  static ref TRACING: () = {
+    let filter = if std::env::var("TEST_LOG").is_ok() { "debug" } else { "" };
+    init_subscriber(get_subscriber("test".into(), filter.into()));
+  };
+}
 
 pub struct TestApp {
   pub address: String,
@@ -32,6 +40,8 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
 }
 
 async fn spawn_app() -> TestApp {
+  lazy_static::initialize(&TRACING);
+
   let listener = TcpListener::bind("127.0.0.1:0")
     .expect("Failed to bind random port.");
   let port = listener.local_addr().unwrap().port();
